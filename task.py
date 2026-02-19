@@ -1,0 +1,63 @@
+from enum import Enum
+from uuid import uuid4
+from pydantic import BaseModel, Field
+from typing import Any, Literal, List
+from datetime import datetime
+
+
+# Represents one part of a message, currently only plain text is allowed
+class TextPart(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+
+Part = TextPart
+
+
+# A message in the context of a task, either from the user or the agent
+class Message(BaseModel):
+    role: Literal["user", "agent"]
+    parts: List[Part]
+
+
+# Describes the state of a task at a given moment
+class TaskStatus(BaseModel):
+    state: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+# The core unit of work in the Agent2Agent protocol
+class Task(BaseModel):
+    id: str
+    status: TaskStatus
+    history: List[Message]
+
+
+# Used to identify a task, e.g., when canceling or querying
+class TaskIdParams(BaseModel):
+    id: str
+    metadata: dict[str, Any] | None = None
+
+
+# Extends TaskIdParams to include optional history length for querying tasks
+class TaskQueryParams(TaskIdParams):
+    historyLength: int | None = None
+
+
+# Parameters required to send a new task to an agent
+class TaskSendParams(BaseModel):
+    id: str
+    sessionId: str = Field(default_factory=lambda: uuid4().hex)
+    message: Message
+    historyLength: int | None = None
+    metadata: dict[str, Any] | None = None
+
+
+# Enum for predefined task lifecycle states
+class TaskState(str, Enum):
+    SUBMITTED = "submitted"
+    WORKING = "working"
+    INPUT_REQUIRED = "input-required"
+    COMPLETED = "completed"
+    CANCELED = "canceled"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
